@@ -2,6 +2,7 @@ import streamlit as st
 from PIL import Image, ImageOps
 import numpy as np
 import cv2
+from ultralytics import YOLO
 import matplotlib.pyplot as plt
 
 # Mengatur konfigurasi halaman
@@ -12,16 +13,31 @@ st.write("""
 """)
 
 uploaded_file = st.file_uploader("Pilih gambar", type=["jpg", "jpeg", "png"])
+model = YOLO('yolov8n.pt')
+object_names = list(model.names.values())
 
 if uploaded_file is not None:
     image = Image.open(uploaded_file)
     img = np.array(image)
     img = img[:, :, ::-1].copy()
     image = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+
+    # Deteksi wajah
     face_cascade = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
     faces = face_cascade.detectMultiScale(image, 1.3, 5)
     for (x, y, w, h) in faces:
         cv2.rectangle(image, (x, y), (x + w, y + h), (255, 0, 0), 2)
+    
+    # Deteksi objek dengan YOLO
+    results = model(img)
+    for result in results:
+        for box in result.boxes:
+            x1, y1, x2, y2 = map(int, box.xyxy[0])
+            label = object_names[int(box.cls[0])]
+            confidence = box.conf[0]
+            cv2.rectangle(image, (x1, y1), (x2, y2), (0, 255, 0), 2)
+            cv2.putText(image, f'{label} {confidence:.2f}', (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+    
     st.image(Image.fromarray(image), caption="Gambar yang diunggah", use_column_width=True)
 
     # Menampilkan informasi gambar
